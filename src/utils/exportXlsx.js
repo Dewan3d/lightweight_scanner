@@ -25,5 +25,32 @@ export function exportToXlsx(scans, filename = 'scan_export') {
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, worksheet, 'Scans');
 
-  XLSX.writeFile(workbook, `${filename}.xlsx`);
+  // Generate Excel file buffer
+  const wbout = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+
+  // Create Blob with explicit Excel MIME type (Safari requires this to handle the file correctly)
+  const blob = new Blob([wbout], {
+    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  });
+
+  // Fallback for older IE/Edge if applicable
+  if (window.navigator && window.navigator.msSaveOrOpenBlob) {
+    window.navigator.msSaveOrOpenBlob(blob, `${filename}.xlsx`);
+    return;
+  }
+
+  // Trigger download with temporary anchor tag
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.style.display = 'none';
+  a.href = url;
+  a.download = `${filename}.xlsx`;
+  document.body.appendChild(a);
+  a.click();
+
+  // Delay revoking the ObjectURL so Safari/iOS has time to process the download
+  setTimeout(() => {
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
+  }, 500);
 }
