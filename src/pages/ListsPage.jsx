@@ -94,10 +94,18 @@ export default function ListsPage() {
     }
   }, []);
 
-  // Cleanup pending timeouts on unmount
+  // Cleanup pending timeouts on unmount by executing the deletes immediately
   useEffect(() => {
     return () => {
-      Object.values(pendingDeletesRef.current).forEach(({ timeout }) => clearTimeout(timeout));
+      Object.values(pendingDeletesRef.current).forEach(({ timeout, scan }) => {
+        clearTimeout(timeout);
+        // Execute the database delete immediately
+        supabase.from('scans').delete().eq('id', scan.id).then(({ error }) => {
+          if (error) {
+            console.error('Failed to delete scan on unmount:', error);
+          }
+        });
+      });
     };
   }, []);
 
