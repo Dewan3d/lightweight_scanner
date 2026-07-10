@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import { exportToXlsx } from '../utils/exportXlsx';
-import { ArrowLeft, Download, User, ChevronDown, ChevronUp, UserCheck, Users } from 'lucide-react';
+import { ArrowLeft, Download, User, ChevronDown, ChevronUp, UserCheck, Users, Trash2 } from 'lucide-react';
+import toast from 'react-hot-toast';
 
 export default function ListsPage() {
   const { user, profile, branch } = useAuth();
@@ -18,6 +19,87 @@ export default function ListsPage() {
   // UI toggles
   const [activeTab, setActiveTab] = useState('me'); // 'me' or 'dsa'
   const [expandedDsaId, setExpandedDsaId] = useState(null); // ID of currently expanded DSA
+
+  // Pending deletes: map of scan.id -> { timeout, scan } for undo support
+  const pendingDeletesRef = useRef({});
+
+  // Delete a scan with undo toast (optimistic removal, deferred DB delete)
+  const deleteScan = useCallback((scan) => {
+    // Optimistically remove from local state
+    setMyScans((prev) => prev.filter((s) => s.id !== scan.id));
+
+    // Create a toast with an Undo button
+    const toastId = toast(
+      (t) => (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <span style={{ fontSize: '0.875rem' }}>Scan deleted</span>
+          <button
+            onClick={() => {
+              // Undo: restore the scan and cancel the pending delete
+              undoDelete(scan.id);
+              toast.dismiss(t.id);
+            }}
+            style={{
+              background: 'var(--color-primary)',
+              color: '#fff',
+              border: 'none',
+              borderRadius: '0.375rem',
+              padding: '0.25rem 0.75rem',
+              fontSize: '0.8125rem',
+              fontWeight: 700,
+              cursor: 'pointer',
+              fontFamily: 'var(--font-sans)',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            Undo
+          </button>
+        </div>
+      ),
+      {
+        duration: 5000,
+        position: 'bottom-center',
+        style: {
+          background: 'var(--color-secondary)',
+          color: '#fff',
+        },
+      }
+    );
+
+    // Schedule the actual DB delete after 5 seconds
+    const timeout = setTimeout(async () => {
+      delete pendingDeletesRef.current[scan.id];
+      try {
+        const { error } = await supabase.from('scans').delete().eq('id', scan.id);
+        if (error) throw error;
+      } catch (err) {
+        console.error('Failed to delete scan:', err);
+        // Restore on failure
+        setMyScans((prev) => [scan, ...prev].sort((a, b) => new Date(b.created_at) - new Date(a.created_at)));
+        toast.error('Failed to delete scan. It has been restored.', { position: 'bottom-center' });
+      }
+    }, 5200); // Slightly longer than toast duration
+
+    pendingDeletesRef.current[scan.id] = { timeout, scan, toastId };
+  }, []);
+
+  // Undo a pending delete
+  const undoDelete = useCallback((scanId) => {
+    const pending = pendingDeletesRef.current[scanId];
+    if (pending) {
+      clearTimeout(pending.timeout);
+      // Restore the scan to local state in correct chronological position
+      setMyScans((prev) => [pending.scan, ...prev].sort((a, b) => new Date(b.created_at) - new Date(a.created_at)));
+      delete pendingDeletesRef.current[scanId];
+    }
+  }, []);
+
+  // Cleanup pending timeouts on unmount
+  useEffect(() => {
+    return () => {
+      Object.values(pendingDeletesRef.current).forEach(({ timeout }) => clearTimeout(timeout));
+    };
+  }, []);
 
   useEffect(() => {
     async function loadData() {
@@ -235,6 +317,7 @@ export default function ListsPage() {
                     <th>Serial Number</th>
                     <th>Paygo Code</th>
                     <th>Time</th>
+                    <th style={{ width: 40, textAlign: 'center' }}></th>
                   </tr>
                 </thead>
                 <tbody>
@@ -245,6 +328,15 @@ export default function ListsPage() {
                         {scan.paygo || '—'}
                       </td>
                       <td style={{ whiteSpace: 'nowrap' }}>{formatTimestamp(scan.created_at)}</td>
+                      <td style={{ textAlign: 'center', padding: '0.5rem 0.25rem' }}>
+                        <button
+                          className="delete-scan-btn"
+                          onClick={() => deleteScan(scan)}
+                          title="Delete this scan"
+                        >
+                          <Trash2 size={15} />
+                        </button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>

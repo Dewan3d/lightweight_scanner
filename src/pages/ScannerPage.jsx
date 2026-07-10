@@ -43,8 +43,23 @@ export default function ScannerPage() {
     }
   };
 
+  // Check if an error is a duplicate key violation (Postgres 23505)
+  const isDuplicateError = useCallback((err) => {
+    if (!err) return false;
+    // Supabase surfaces the Postgres error code in the error object
+    if (err.code === '23505') return true;
+    // Fallback: check the message for unique constraint text
+    const msg = (err.message || '').toLowerCase();
+    return msg.includes('unique') || msg.includes('duplicate') || msg.includes('23505');
+  }, []);
+
   // Handle scans rate limiting and general DB insert errors
   const handleScanError = useCallback((err) => {
+    // Silently ignore duplicate barcode errors — the user sees normal beep + flash
+    if (isDuplicateError(err)) {
+      console.log('Duplicate barcode ignored (already exists in this branch).');
+      return;
+    }
     console.error('Scan save error:', err);
     if (err && err.message && err.message.includes('Rate limit exceeded')) {
       toast.error('Scanning too fast! Please wait a moment.', {
@@ -59,7 +74,7 @@ export default function ScannerPage() {
     } else {
       toast.error(err?.message || 'Failed to save scan', { position: 'bottom-center' });
     }
-  }, []);
+  }, [isDuplicateError]);
 
   // Main callback when a barcode is decoded
   const handleScanSuccess = useCallback(
