@@ -58,17 +58,37 @@ export default function AdminPage() {
         .order('name');
       if (branchError) throw branchError;
 
-      // Get all scans with profile names
-      const { data: scans, error: scanError } = await supabase
-        .from('scans')
-        .select('id, barcode, paygo, scanned_by, branch_id, created_at, profiles ( full_name )')
-        .order('created_at', { ascending: false });
-      if (scanError) throw scanError;
+      // Get all scans with profile names (paginated to bypass Supabase's 1000 row limit)
+      let allScans = [];
+      let page = 0;
+      const pageSize = 1000;
+      let hasMore = true;
+
+      while (hasMore) {
+        const { data: scans, error: scanError } = await supabase
+          .from('scans')
+          .select('id, barcode, paygo, scanned_by, branch_id, created_at, profiles ( full_name )')
+          .order('created_at', { ascending: false })
+          .range(page * pageSize, (page + 1) * pageSize - 1);
+
+        if (scanError) throw scanError;
+
+        if (scans && scans.length > 0) {
+          allScans = [...allScans, ...scans];
+          if (scans.length < pageSize) {
+            hasMore = false;
+          } else {
+            page++;
+          }
+        } else {
+          hasMore = false;
+        }
+      }
 
       // Group scans by branch
       const grouped = (branchData || []).map((branch) => ({
         branch,
-        scans: (scans || []).filter((s) => s.branch_id === branch.id),
+        scans: allScans.filter((s) => s.branch_id === branch.id),
       }));
 
       setBranchExportData(grouped);
