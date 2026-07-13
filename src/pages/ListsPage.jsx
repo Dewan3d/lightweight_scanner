@@ -325,7 +325,7 @@ export default function ListsPage() {
                     <th>Serial Number</th>
                     <th>Paygo Code</th>
                     <th>Time</th>
-                    <th style={{ width: 40, textAlign: 'center' }}></th>
+                    <th className="sticky-delete-col" style={{ width: 44, textAlign: 'center' }}></th>
                   </tr>
                 </thead>
                 <tbody>
@@ -336,7 +336,7 @@ export default function ListsPage() {
                         {scan.paygo || '—'}
                       </td>
                       <td style={{ whiteSpace: 'nowrap' }}>{formatTimestamp(scan.created_at)}</td>
-                      <td style={{ textAlign: 'center', padding: '0.5rem 0.25rem' }}>
+                      <td className="sticky-delete-col" style={{ textAlign: 'center', padding: '0.5rem 0.25rem' }}>
                         <button
                           className="delete-scan-btn"
                           onClick={() => deleteScan(scan)}

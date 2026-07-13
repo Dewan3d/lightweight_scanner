@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { exportToXlsx } from '../utils/exportXlsx';
 import toast from 'react-hot-toast';
-import { ArrowLeft, UserCheck, ShieldAlert, Search, Download, ChevronDown, ChevronUp, Users, Settings } from 'lucide-react';
+import { ArrowLeft, UserCheck, ShieldAlert, Search, Download, ChevronDown, ChevronUp, Users, Settings, Sparkles } from 'lucide-react';
 
 export default function AdminPage() {
   const navigate = useNavigate();
@@ -236,8 +236,34 @@ export default function AdminPage() {
             <ArrowLeft size={18} />
             Back to Dashboard
           </button>
-          <h1 className="page-title">Admin Console</h1>
-          <p className="page-subtitle">Manage users and export branch data</p>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.75rem' }}>
+            <div>
+              <h1 className="page-title">Admin Console</h1>
+              <p className="page-subtitle">Manage users and export branch data</p>
+            </div>
+            <button
+              onClick={() => navigate('/enrichment')}
+              className="btn-outline"
+              style={{
+                width: 'auto',
+                minHeight: 40,
+                padding: '0.5rem 0.875rem',
+                fontSize: '0.875rem',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.375rem',
+                borderRadius: '0.5rem',
+                fontWeight: 600,
+                background: 'rgba(99, 102, 241, 0.08)',
+                borderColor: 'rgb(99, 102, 241)',
+                color: 'rgb(99, 102, 241)',
+                cursor: 'pointer',
+              }}
+            >
+              <Sparkles size={16} />
+              Data Enrichment
+            </button>
+          </div>
         </div>
 
         {/* Tab Selection */}

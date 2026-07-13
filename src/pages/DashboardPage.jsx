@@ -10,6 +10,7 @@ import {
   LogOut,
   User,
   ShieldAlert,
+  Sparkles,
 } from 'lucide-react';
 
 export default function DashboardPage() {
@@ -101,25 +102,46 @@ export default function DashboardPage() {
           </div>
           <div className="flex gap-2">
             {user?.email === 'gabrieldewan365@gmail.com' && (
-              <button
-                onClick={() => navigate('/admin')}
-                className="btn-outline"
-                style={{
-                  width: 'auto',
-                  padding: '0.5rem',
-                  minHeight: 40,
-                  borderRadius: '0.5rem',
-                  background: 'rgba(239, 68, 68, 0.08)',
-                  border: '1.5px solid var(--color-error)',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-                title="Admin Panel"
-              >
-                <ShieldAlert size={20} color="var(--color-error)" />
-              </button>
+              <>
+                <button
+                  onClick={() => navigate('/enrichment')}
+                  className="btn-outline"
+                  style={{
+                    width: 'auto',
+                    padding: '0.5rem',
+                    minHeight: 40,
+                    borderRadius: '0.5rem',
+                    background: 'rgba(99, 102, 241, 0.08)',
+                    border: '1.5px solid rgb(99, 102, 241)',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                  title="Data Enrichment"
+                >
+                  <Sparkles size={20} color="rgb(99, 102, 241)" />
+                </button>
+                <button
+                  onClick={() => navigate('/admin')}
+                  className="btn-outline"
+                  style={{
+                    width: 'auto',
+                    padding: '0.5rem',
+                    minHeight: 40,
+                    borderRadius: '0.5rem',
+                    background: 'rgba(239, 68, 68, 0.08)',
+                    border: '1.5px solid var(--color-error)',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                  title="Admin Panel"
+                >
+                  <ShieldAlert size={20} color="var(--color-error)" />
+                </button>
+              </>
             )}
             <button
               onClick={() => navigate('/setup')}

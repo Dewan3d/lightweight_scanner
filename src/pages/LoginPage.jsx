@@ -6,7 +6,7 @@ import { LogIn, Mail, Lock, UserPlus } from 'lucide-react';
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [isSignUp, setIsSignUp] = useState(false);
+  const [isSignUp, setIsSignUp] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const { signIn, signUp } = useAuth();
@@ -20,9 +20,7 @@ export default function LoginPage() {
     try {
       if (isSignUp) {
         await signUp(email, password);
-        setError('');
-        setIsSignUp(false);
-        alert('Account created! Please check your email to confirm, then sign in.');
+        navigate('/setup');
       } else {
         await signIn(email, password);
         navigate('/setup');

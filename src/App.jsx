@@ -10,6 +10,7 @@ import DashboardPage from './pages/DashboardPage';
 import ScannerPage from './pages/ScannerPage';
 import ListsPage from './pages/ListsPage';
 import AdminPage from './pages/AdminPage';
+import EnrichmentPage from './pages/EnrichmentPage';
 
 export default function App() {
   return (
@@ -63,6 +64,16 @@ export default function App() {
               <ProtectedRoute>
                 <AdminGuard>
                   <AdminPage />
+                </AdminGuard>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/enrichment"
+            element={
+              <ProtectedRoute>
+                <AdminGuard>
+                  <EnrichmentPage />
                 </AdminGuard>
               </ProtectedRoute>
             }
