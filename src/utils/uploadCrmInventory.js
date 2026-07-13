@@ -51,7 +51,7 @@ export async function uploadCrmInventory(file, onProgress = () => {}) {
   const batchId = crypto.randomUUID();
 
   // Delete all previous records (we only keep the latest upload)
-  const { error: deleteError } = await supabase.from('crm_inventory').delete().neq('batch_id', 'impossible-id');
+  const { error: deleteError } = await supabase.from('crm_inventory').delete().neq('serial_number', '_impossible_serial_number_');
   if (deleteError) {
     console.error('Failed to clear previous CRM data:', deleteError);
     // Continue anyway — insert will still work
