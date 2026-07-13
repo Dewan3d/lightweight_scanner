@@ -129,17 +129,36 @@ function parseCreationTime(value) {
   const str = String(value).trim();
   if (!str) return null;
 
-  // Try parsing as ISO or common date formats
-  const parsed = new Date(str);
-  if (!isNaN(parsed.getTime())) {
-    return parsed.toISOString();
+  // Check if it's a simple number (integer or float)
+  if (/^\d+(\.\d+)?$/.test(str)) {
+    const num = Number(str);
+    // Excel serial dates: 1 to 100,000 (roughly covering year 1900 to 2173)
+    if (num > 0 && num < 100000) {
+      const excelEpoch = new Date(1899, 11, 30);
+      const date = new Date(excelEpoch.getTime() + num * 86400000);
+      if (!isNaN(date.getTime())) return date.toISOString();
+    }
+    // Unix timestamp in seconds
+    if (num >= 1000000000 && num < 9999999999) {
+      const date = new Date(num * 1000);
+      if (!isNaN(date.getTime())) return date.toISOString();
+    }
+    // Unix timestamp in milliseconds
+    if (num >= 1000000000000 && num < 9999999999999) {
+      const date = new Date(num);
+      if (!isNaN(date.getTime())) return date.toISOString();
+    }
+    return null; // Don't allow arbitrary years like 45665
   }
 
-  // Excel serial date number
-  if (!isNaN(Number(str))) {
-    const excelEpoch = new Date(1899, 11, 30);
-    const date = new Date(excelEpoch.getTime() + Number(str) * 86400000);
-    if (!isNaN(date.getTime())) return date.toISOString();
+  // Try parsing standard string date format
+  const parsed = new Date(str);
+  if (!isNaN(parsed.getTime())) {
+    // Sanity check for reasonable year range to prevent DB errors
+    const year = parsed.getUTCFullYear();
+    if (year >= 1970 && year <= 2100) {
+      return parsed.toISOString();
+    }
   }
 
   return null;
