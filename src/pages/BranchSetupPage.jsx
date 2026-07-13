@@ -4,10 +4,12 @@ import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import { Building2, ChevronRight, ArrowLeft, User } from 'lucide-react';
 
+import { checkIsAdmin } from '../utils/admin';
+
 export default function BranchSetupPage() {
   const { user, profile, refreshProfile } = useAuth();
   const navigate = useNavigate();
-  const isAdmin = user && user.email === 'gabrieldewan365@gmail.com';
+  const isAdmin = user && checkIsAdmin(user.email);
   const [branches, setBranches] = useState([]);
   const [selectedBranch, setSelectedBranch] = useState('');
   const [selectedRole, setSelectedRole] = useState('DSA');

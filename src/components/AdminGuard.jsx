@@ -1,5 +1,6 @@
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { checkIsAdmin } from '../utils/admin';
 
 export default function AdminGuard({ children }) {
   const { user, loading } = useAuth();
@@ -13,7 +14,7 @@ export default function AdminGuard({ children }) {
   }
 
   // Strictly verify email addresses of administrators
-  const isAdmin = user && user.email === 'gabrieldewan365@gmail.com';
+  const isAdmin = user && checkIsAdmin(user.email);
 
   if (!isAdmin) {
     return <Navigate to="/dashboard" replace />;

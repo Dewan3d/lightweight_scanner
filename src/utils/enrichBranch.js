@@ -107,7 +107,7 @@ export async function enrichBranch(branchId, branchName, onProgress = () => {}) 
     const result = enrichSingleScan(scan, serialMap, paygoMap, branchScrNames);
     results.push(result);
 
-    if (result.enrichment_status === 'Pass') {
+    if (result.device_verification === 'Pass' && result.scr_verification === 'Pass') {
       passCount++;
     } else {
       failCount++;
@@ -130,27 +130,20 @@ export async function enrichBranch(branchId, branchName, onProgress = () => {}) 
  * Exports enrichment results as an Excel file.
  */
 export function exportEnrichmentResults(results, branchName) {
-  const worksheetData = results.map((r) => {
-    const row = {
-      'Serial Number': r.barcode,
-      'Paygo Code': r.paygo || '—',
-      'CRM Serial': r.crm_serial || '—',
-      'CRM PayGo': r.crm_paygo || '—',
-      'Scanned By': r.scanned_by_name,
-      'Branch': r.branch_name,
-      'Scan Date': r.scan_date,
-      'CRM SCR Name': r.crm_scr_name || '—',
-      'Enrichment Status': r.enrichment_status,
-    };
-
-    if (r.enrichment_status === 'Fail') {
-      row['Failure Reason'] = r.failure_reason;
-    } else {
-      row['Failure Reason'] = '—';
-    }
-
-    return row;
-  });
+  const worksheetData = results.map((r) => ({
+    'Serial Number': r.barcode,
+    'Paygo Code': r.paygo || '—',
+    'CRM Serial': r.crm_serial || '—',
+    'CRM PayGo': r.crm_paygo || '—',
+    'Scanned By': r.scanned_by_name,
+    'Branch': r.branch_name,
+    'Scan Date': r.scan_date,
+    'CRM SCR Name': r.crm_scr_name || '—',
+    'Device Verification': r.device_verification,
+    'Device Failure Reason': r.device_failure_reason || '—',
+    'SCR Verification': r.scr_verification,
+    'SCR Failure Reason': r.scr_failure_reason || '—',
+  }));
 
   // Use the xlsx library (already imported at top)
   const worksheet = XLSX.utils.json_to_sheet(worksheetData);
@@ -198,7 +191,6 @@ function enrichSingleScan(scan, serialMap, paygoMap, branchScrNames) {
   const barcode = (scan.barcode || '').trim();
   const paygo = (scan.paygo || '').trim();
   const scannerName = scan.profiles?.full_name || '';
-  const scannerRole = scan.profiles?.role || '';
 
   const base = {
     barcode: scan.barcode,
@@ -209,8 +201,10 @@ function enrichSingleScan(scan, serialMap, paygoMap, branchScrNames) {
     crm_serial: null,
     crm_paygo: null,
     crm_scr_name: null,
-    enrichment_status: 'Fail',
-    failure_reason: '',
+    device_verification: 'Fail',
+    device_failure_reason: '',
+    scr_verification: 'Fail',
+    scr_failure_reason: '',
   };
 
   // ===== PHASE 1: Verify & Identify =====
@@ -224,7 +218,8 @@ function enrichSingleScan(scan, serialMap, paygoMap, branchScrNames) {
       crmRecord = dualResult.crmRecord;
       matchedBy = dualResult.matchedBy;
     } else {
-      base.failure_reason = dualResult.reason;
+      base.device_failure_reason = dualResult.reason;
+      base.scr_failure_reason = 'Device verification failed';
       return base;
     }
   } else if (barcode) {
@@ -234,11 +229,13 @@ function enrichSingleScan(scan, serialMap, paygoMap, branchScrNames) {
       crmRecord = singleResult.crmRecord;
       matchedBy = singleResult.matchedBy;
     } else {
-      base.failure_reason = singleResult.reason;
+      base.device_failure_reason = singleResult.reason;
+      base.scr_failure_reason = 'Device verification failed';
       return base;
     }
   } else {
-    base.failure_reason = 'Empty barcode — no data to verify';
+    base.device_failure_reason = 'Empty barcode — no data to verify';
+    base.scr_failure_reason = 'Device verification failed';
     return base;
   }
 
@@ -249,24 +246,30 @@ function enrichSingleScan(scan, serialMap, paygoMap, branchScrNames) {
 
   // Check that the counterpart exists
   if (matchedBy === 'serial' && !crmRecord.paygo_number) {
-    base.failure_reason = 'Counterpart missing: Serial found in CRM but no PayGo number linked';
+    base.device_failure_reason = 'Counterpart missing: Serial found in CRM but no PayGo number linked';
+    base.scr_failure_reason = 'Device verification failed';
     return base;
   }
   if (matchedBy === 'paygo' && !crmRecord.serial_number) {
-    base.failure_reason = 'Counterpart missing: PayGo found in CRM but no Serial number linked';
+    base.device_failure_reason = 'Counterpart missing: PayGo found in CRM but no Serial number linked';
+    base.scr_failure_reason = 'Device verification failed';
     return base;
   }
+
+  // If we reach here, Device Verification has passed!
+  base.device_verification = 'Pass';
+  base.device_failure_reason = '';
 
   // ===== PHASE 3: SCR Name Validation =====
   const crmScrName = crmRecord.scr_name || '';
 
   if (!crmScrName) {
-    base.failure_reason = 'CRM record has no SCR name assigned';
+    base.scr_failure_reason = 'CRM record has no SCR name assigned';
     return base;
   }
 
   if (branchScrNames.length === 0) {
-    base.failure_reason = 'No SCR users found for this branch in the scanner app';
+    base.scr_failure_reason = 'No SCR users found for this branch in the scanner app';
     return base;
   }
 
@@ -275,13 +278,13 @@ function enrichSingleScan(scan, serialMap, paygoMap, branchScrNames) {
   );
 
   if (!scrMatched) {
-    base.failure_reason = `SCR name mismatch: CRM has "${crmScrName}", Branch SCR(s): "${branchScrNames.join(', ')}"`;
+    base.scr_failure_reason = `SCR name mismatch: CRM has "${crmScrName}", Branch SCR(s): "${branchScrNames.join(', ')}"`;
     return base;
   }
 
-  // ===== ALL PHASES PASSED =====
-  base.enrichment_status = 'Pass';
-  base.failure_reason = '';
+  // ===== SCR VERIFICATION PASSED =====
+  base.scr_verification = 'Pass';
+  base.scr_failure_reason = '';
   return base;
 }
 

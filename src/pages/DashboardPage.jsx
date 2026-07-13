@@ -13,6 +13,8 @@ import {
   Sparkles,
 } from 'lucide-react';
 
+import { checkIsAdmin } from '../utils/admin';
+
 export default function DashboardPage() {
   const { user, profile, branch, signOut } = useAuth();
   const navigate = useNavigate();
@@ -101,7 +103,7 @@ export default function DashboardPage() {
             </div>
           </div>
           <div className="flex gap-2">
-            {user?.email === 'gabrieldewan365@gmail.com' && (
+            {checkIsAdmin(user?.email) && (
               <>
                 <button
                   onClick={() => navigate('/enrichment')}
