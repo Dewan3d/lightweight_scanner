@@ -11,6 +11,7 @@ import ScannerPage from './pages/ScannerPage';
 import ListsPage from './pages/ListsPage';
 import AdminPage from './pages/AdminPage';
 import EnrichmentPage from './pages/EnrichmentPage';
+import StockVerifierPage from './pages/StockVerifierPage';
 
 export default function App() {
   return (
@@ -74,6 +75,17 @@ export default function App() {
               <ProtectedRoute>
                 <AdminGuard>
                   <EnrichmentPage />
+                </AdminGuard>
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/stock-verifier"
+            element={
+              <ProtectedRoute>
+                <AdminGuard>
+                  <StockVerifierPage />
                 </AdminGuard>
               </ProtectedRoute>
             }

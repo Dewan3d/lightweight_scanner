@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { exportToXlsx } from '../utils/exportXlsx';
 import toast from 'react-hot-toast';
-import { ArrowLeft, UserCheck, ShieldAlert, Search, Download, ChevronDown, ChevronUp, Users, Settings, Sparkles } from 'lucide-react';
+import { ArrowLeft, UserCheck, ShieldAlert, Search, Download, ChevronDown, ChevronUp, Users, Settings, Sparkles, Package } from 'lucide-react';
 
 export default function AdminPage() {
   const navigate = useNavigate();
@@ -262,6 +262,28 @@ export default function AdminPage() {
             >
               <Sparkles size={16} />
               Data Enrichment
+            </button>
+            <button
+              onClick={() => navigate('/stock-verifier')}
+              className="btn-outline"
+              style={{
+                width: 'auto',
+                minHeight: 40,
+                padding: '0.5rem 0.875rem',
+                fontSize: '0.875rem',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.375rem',
+                borderRadius: '0.5rem',
+                fontWeight: 600,
+                background: 'rgba(16, 185, 129, 0.08)',
+                borderColor: 'rgb(16, 185, 129)',
+                color: 'rgb(16, 185, 129)',
+                cursor: 'pointer',
+              }}
+            >
+              <Package size={16} />
+              Stock Verifier
             </button>
           </div>
         </div>

@@ -11,6 +11,7 @@ import {
   User,
   ShieldAlert,
   Sparkles,
+  Package,
 } from 'lucide-react';
 
 import { checkIsAdmin } from '../utils/admin';
@@ -123,6 +124,25 @@ export default function DashboardPage() {
                   title="Data Enrichment"
                 >
                   <Sparkles size={20} color="rgb(99, 102, 241)" />
+                </button>
+                <button
+                  onClick={() => navigate('/stock-verifier')}
+                  className="btn-outline"
+                  style={{
+                    width: 'auto',
+                    padding: '0.5rem',
+                    minHeight: 40,
+                    borderRadius: '0.5rem',
+                    background: 'rgba(16, 185, 129, 0.08)',
+                    border: '1.5px solid rgb(16, 185, 129)',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                  title="Stock Verifier"
+                >
+                  <Package size={20} color="rgb(16, 185, 129)" />
                 </button>
                 <button
                   onClick={() => navigate('/admin')}
