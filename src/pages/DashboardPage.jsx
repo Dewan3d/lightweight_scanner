@@ -103,54 +103,17 @@ export default function DashboardPage() {
               <span className="badge badge-gray">{branch?.name || 'No branch'}</span>
             </div>
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-1.5" style={{ flexShrink: 0 }}>
             {checkIsAdmin(user?.email) && (
               <>
-                <button
-                  onClick={() => navigate('/enrichment')}
-                  className="btn-outline"
-                  style={{
-                    width: 'auto',
-                    padding: '0.5rem',
-                    minHeight: 40,
-                    borderRadius: '0.5rem',
-                    background: 'rgba(99, 102, 241, 0.08)',
-                    border: '1.5px solid rgb(99, 102, 241)',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
-                  title="Data Enrichment"
-                >
-                  <Sparkles size={20} color="rgb(99, 102, 241)" />
-                </button>
-                <button
-                  onClick={() => navigate('/stock-verifier')}
-                  className="btn-outline"
-                  style={{
-                    width: 'auto',
-                    padding: '0.5rem',
-                    minHeight: 40,
-                    borderRadius: '0.5rem',
-                    background: 'rgba(16, 185, 129, 0.08)',
-                    border: '1.5px solid rgb(16, 185, 129)',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
-                  title="Stock Verifier"
-                >
-                  <Package size={20} color="rgb(16, 185, 129)" />
-                </button>
                 <button
                   onClick={() => navigate('/admin')}
                   className="btn-outline"
                   style={{
-                    width: 'auto',
-                    padding: '0.5rem',
-                    minHeight: 40,
+                    width: 34,
+                    height: 34,
+                    minHeight: 'unset',
+                    padding: 0,
                     borderRadius: '0.5rem',
                     background: 'rgba(239, 68, 68, 0.08)',
                     border: '1.5px solid var(--color-error)',
@@ -161,7 +124,47 @@ export default function DashboardPage() {
                   }}
                   title="Admin Panel"
                 >
-                  <ShieldAlert size={20} color="var(--color-error)" />
+                  <ShieldAlert size={16} color="var(--color-error)" />
+                </button>
+                <button
+                  onClick={() => navigate('/stock-verifier')}
+                  className="btn-outline"
+                  style={{
+                    width: 34,
+                    height: 34,
+                    minHeight: 'unset',
+                    padding: 0,
+                    borderRadius: '0.5rem',
+                    background: 'rgba(16, 185, 129, 0.08)',
+                    border: '1.5px solid rgb(16, 185, 129)',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                  title="Stock Verifier"
+                >
+                  <Package size={16} color="rgb(16, 185, 129)" />
+                </button>
+                <button
+                  onClick={() => navigate('/enrichment')}
+                  className="btn-outline"
+                  style={{
+                    width: 34,
+                    height: 34,
+                    minHeight: 'unset',
+                    padding: 0,
+                    borderRadius: '0.5rem',
+                    background: 'rgba(99, 102, 241, 0.08)',
+                    border: '1.5px solid rgb(99, 102, 241)',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                  title="Data Enrichment"
+                >
+                  <Sparkles size={16} color="rgb(99, 102, 241)" />
                 </button>
               </>
             )}
@@ -169,9 +172,10 @@ export default function DashboardPage() {
               onClick={() => navigate('/setup')}
               className="btn-outline"
               style={{
-                width: 'auto',
-                padding: '0.5rem',
-                minHeight: 40,
+                width: 34,
+                height: 34,
+                minHeight: 'unset',
+                padding: 0,
                 borderRadius: '0.5rem',
                 background: 'none',
                 border: '1.5px solid var(--color-border)',
@@ -182,15 +186,16 @@ export default function DashboardPage() {
               }}
               title="Edit Profile"
             >
-              <User size={20} color="var(--color-text-muted)" />
+              <User size={16} color="var(--color-text-muted)" />
             </button>
             <button
               onClick={handleLogout}
               className="btn-outline"
               style={{
-                width: 'auto',
-                padding: '0.5rem',
-                minHeight: 40,
+                width: 34,
+                height: 34,
+                minHeight: 'unset',
+                padding: 0,
                 borderRadius: '0.5rem',
                 background: 'none',
                 border: '1.5px solid var(--color-border)',
@@ -201,7 +206,7 @@ export default function DashboardPage() {
               }}
               title="Sign out"
             >
-              <LogOut size={20} color="var(--color-text-muted)" />
+              <LogOut size={16} color="var(--color-text-muted)" />
             </button>
           </div>
         </div>
