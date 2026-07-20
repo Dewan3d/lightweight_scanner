@@ -1,6 +1,18 @@
 import * as XLSX from 'xlsx';
 
 /**
+ * Normalizes a name for comparison: lowercase, trim, collapse multiple spaces.
+ * @param {string} name
+ * @returns {string}
+ */
+function normalizeName(name) {
+  return String(name || '')
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, ' ');
+}
+
+/**
  * Parses the Sales Orders Excel file and calculates units sold per order.
  *
  * Expected columns: Branch, OrderNo, OrderDate, ProductDetail, ServiceName
@@ -9,11 +21,13 @@ import * as XLSX from 'xlsx';
  *   - Each item has format PRODUCT_CODE*QUANTITY
  *
  * @param {File} file - The Sales Orders Excel file
+ * @param {string} selectedBranch - Name of the branch being audited
+ * @param {string[]} branchSCRNames - List of SCR names registered to this branch
  * @param {Date} startDate - Start of date range (inclusive)
  * @param {Date} endDate - End of date range (inclusive, end of day)
- * @returns {Promise<Object>} Parsed sales data with totals, per-SCR breakdown, and product breakdown
+ * @returns {Promise<Object>} Parsed sales data with historical and period breakdowns
  */
-export async function parseSalesOrders(file, startDate, endDate) {
+export async function parseSalesOrders(file, selectedBranch, branchSCRNames, startDate, endDate) {
   const buffer = await file.arrayBuffer();
   const workbook = XLSX.read(buffer, { type: 'array' });
   const sheet = workbook.Sheets[workbook.SheetNames[0]];
@@ -51,10 +65,16 @@ export async function parseSalesOrders(file, startDate, endDate) {
   const rangeEnd = new Date(endDate);
   rangeEnd.setHours(23, 59, 59, 999);
 
-  let totalUnitsSold = 0;
-  const perSCR = {}; // { name: { unitsSold, orderCount } }
-  const productBreakdown = {}; // { productCode: totalQty }
-  const orderDetails = []; // For export
+  // Set up branch lookup helpers
+  const branchSCRSet = new Set(branchSCRNames.map(normalizeName));
+  const isUnassignedSelected = selectedBranch.toLowerCase().trim() === 'unassigned / blank';
+
+  let historicalUnitsSold = 0;
+  let periodUnitsSold = 0;
+  
+  const perSCR = {}; // { name: { historicalSold: 0, periodSold: 0, periodOrders: 0 } }
+  const productBreakdown = {}; // { friendlyProductCode: totalQty }
+  const orderDetails = []; // For export (period only)
 
   for (let i = 1; i < rows.length; i++) {
     const row = rows[i];
@@ -75,8 +95,24 @@ export async function parseSalesOrders(file, startDate, endDate) {
 
     if (isNaN(orderDate.getTime())) continue;
 
-    // Filter by date range
-    if (orderDate < rangeStart || orderDate > rangeEnd) continue;
+    // Filter out rows after the end date
+    if (orderDate > rangeEnd) continue;
+
+    const saleBranch = branchIdx !== -1 ? String(row[branchIdx] || '').trim() : '';
+    const serviceName = serviceIdx !== -1 ? String(row[serviceIdx] || '').trim() : 'Unknown';
+
+    // Verify if this sale belongs to the branch we are verifying
+    const sellerNorm = normalizeName(serviceName);
+    let isBranchSale = false;
+    if (isUnassignedSelected) {
+      isBranchSale = !saleBranch || branchSCRSet.has(sellerNorm);
+    } else {
+      isBranchSale = saleBranch.toLowerCase() === selectedBranch.toLowerCase().trim() || branchSCRSet.has(sellerNorm);
+    }
+
+    if (!isBranchSale) continue;
+
+    const isHistorical = orderDate < rangeStart;
 
     // Parse ProductDetail
     const productDetail = String(row[productIdx]).trim();
@@ -91,43 +127,55 @@ export async function parseSalesOrders(file, startDate, endDate) {
 
       orderUnits += qty;
 
-      // Track per-product breakdown
-      const friendlyName = getProductFriendlyName(productCode);
-      productBreakdown[friendlyName] = (productBreakdown[friendlyName] || 0) + qty;
-    }
-
-    totalUnitsSold += orderUnits;
-
-    // Track per-SCR
-    const serviceName = serviceIdx !== -1 ? String(row[serviceIdx] || '').trim() : 'Unknown';
-    if (serviceName) {
-      if (!perSCR[serviceName]) {
-        perSCR[serviceName] = { unitsSold: 0, orderCount: 0 };
+      if (!isHistorical) {
+        // Track per-product breakdown (period only)
+        const friendlyName = getProductFriendlyName(productCode);
+        productBreakdown[friendlyName] = (productBreakdown[friendlyName] || 0) + qty;
       }
-      perSCR[serviceName].unitsSold += orderUnits;
-      perSCR[serviceName].orderCount += 1;
     }
 
-    // Track order detail for export
-    orderDetails.push({
-      branch: branchIdx !== -1 ? String(row[branchIdx] || '').trim() : '',
-      orderNo: orderNoIdx !== -1 ? String(row[orderNoIdx] || '').trim() : '',
-      orderDate: orderDate.toISOString().slice(0, 19).replace('T', ' '),
-      productDetail,
-      serviceName,
-      unitCount: orderUnits,
-    });
+    // Initialize SCR tracker if needed
+    if (serviceName && !perSCR[serviceName]) {
+      perSCR[serviceName] = { historicalSold: 0, periodSold: 0, periodOrders: 0 };
+    }
+
+    if (isHistorical) {
+      historicalUnitsSold += orderUnits;
+      if (serviceName) perSCR[serviceName].historicalSold += orderUnits;
+    } else {
+      periodUnitsSold += orderUnits;
+      if (serviceName) {
+        perSCR[serviceName].periodSold += orderUnits;
+        perSCR[serviceName].periodOrders += 1;
+      }
+
+      // Track order detail for export (period only)
+      orderDetails.push({
+        branch: saleBranch,
+        orderNo: orderNoIdx !== -1 ? String(row[orderNoIdx] || '').trim() : '',
+        orderDate: orderDate.toISOString().slice(0, 19).replace('T', ' '),
+        productDetail,
+        serviceName,
+        unitCount: orderUnits,
+      });
+    }
   }
 
   return {
-    totalUnitsSold,
-    perSCR,
-    productBreakdown,
-    orderDetails,
+    historical: {
+      unitsSold: historicalUnitsSold,
+    },
+    period: {
+      unitsSold: periodUnitsSold,
+      productBreakdown,
+      perSCR,
+      orderDetails,
+    },
     totalRows: rows.length - 1,
     filteredRows: orderDetails.length,
   };
 }
+
 
 /**
  * Converts a raw product code to a shorter, human-friendly name.

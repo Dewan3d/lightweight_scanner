@@ -35,12 +35,13 @@ export async function parseSCRRegistry(file) {
 
   for (let i = 1; i < rows.length; i++) {
     const row = rows[i];
-    if (!row || !row[dotNameIdx] || !row[nameIdx]) continue;
+    if (!row || !row[nameIdx]) continue;
 
-    const branch = String(row[dotNameIdx]).trim();
+    const rawBranch = row[dotNameIdx] ? String(row[dotNameIdx]).trim() : '';
+    const branch = rawBranch || 'Unassigned / Blank';
     const name = String(row[nameIdx]).trim();
 
-    if (!branch || !name) continue;
+    if (!name) continue;
 
     const key = branch.toLowerCase();
     if (!branchMap.has(key)) {

@@ -75,13 +75,21 @@ export async function parseTransferRecord(file, branchSCRNames, startDate, endDa
   // Per-SCR breakdown
   const perSCR = {};
   for (const name of branchSCRNames) {
-    perSCR[name] = { received: 0, sentOut: 0, internal: 0 };
+    perSCR[name] = {
+      historicalReceived: 0,
+      historicalSentOut: 0,
+      periodReceived: 0,
+      periodSentOut: 0,
+      periodInternal: 0,
+    };
   }
 
-  let totalReceived = 0;
-  let totalSentOut = 0;
-  let totalInternal = 0;
-  const details = []; // Filtered transfer rows for export
+  let historicalReceived = 0;
+  let historicalSentOut = 0;
+  let periodReceived = 0;
+  let periodSentOut = 0;
+  let periodInternal = 0;
+  const details = []; // Filtered transfer rows for export (period only)
 
   for (let i = 1; i < rows.length; i++) {
     const row = rows[i];
@@ -100,8 +108,8 @@ export async function parseTransferRecord(file, branchSCRNames, startDate, endDa
 
     if (isNaN(transferDate.getTime())) continue;
 
-    // Filter by date range
-    if (transferDate < rangeStart || transferDate > rangeEnd) continue;
+    // Filter out rows after the end date
+    if (transferDate > rangeEnd) continue;
 
     const sender = String(row[sendIdx] || '').trim();
     const receiver = String(row[recvIdx] || '').trim();
@@ -117,47 +125,62 @@ export async function parseTransferRecord(file, branchSCRNames, startDate, endDa
     // Skip if neither party is a branch SCR
     if (!senderIsBranch && !receiverIsBranch) continue;
 
-    let category;
+    const isHistorical = transferDate < rangeStart;
 
     if (senderIsBranch && receiverIsBranch) {
       // Internal transfer — net zero for branch balance
-      category = 'internal';
-      totalInternal += quantity;
-
-      // Track for both SCRs
-      const senderOriginal = findOriginalName(branchSCRNames, senderNorm);
-      const receiverOriginal = findOriginalName(branchSCRNames, receiverNorm);
-      if (senderOriginal && perSCR[senderOriginal]) perSCR[senderOriginal].internal += quantity;
-      if (receiverOriginal && perSCR[receiverOriginal]) perSCR[receiverOriginal].internal += quantity;
+      if (!isHistorical) {
+        periodInternal += quantity;
+        const senderOriginal = findOriginalName(branchSCRNames, senderNorm);
+        const receiverOriginal = findOriginalName(branchSCRNames, receiverNorm);
+        if (senderOriginal && perSCR[senderOriginal]) perSCR[senderOriginal].periodInternal += quantity;
+        if (receiverOriginal && perSCR[receiverOriginal]) perSCR[receiverOriginal].periodInternal += quantity;
+      }
     } else if (receiverIsBranch && !senderIsBranch) {
       // Stock coming INTO the branch
-      category = 'received';
-      totalReceived += quantity;
-
       const receiverOriginal = findOriginalName(branchSCRNames, receiverNorm);
-      if (receiverOriginal && perSCR[receiverOriginal]) perSCR[receiverOriginal].received += quantity;
+      if (isHistorical) {
+        historicalReceived += quantity;
+        if (receiverOriginal && perSCR[receiverOriginal]) perSCR[receiverOriginal].historicalReceived += quantity;
+      } else {
+        periodReceived += quantity;
+        if (receiverOriginal && perSCR[receiverOriginal]) perSCR[receiverOriginal].periodReceived += quantity;
+      }
     } else if (senderIsBranch && !receiverIsBranch) {
       // Stock going OUT of the branch
-      category = 'sentOut';
-      totalSentOut += quantity;
-
       const senderOriginal = findOriginalName(branchSCRNames, senderNorm);
-      if (senderOriginal && perSCR[senderOriginal]) perSCR[senderOriginal].sentOut += quantity;
+      if (isHistorical) {
+        historicalSentOut += quantity;
+        if (senderOriginal && perSCR[senderOriginal]) perSCR[senderOriginal].historicalSentOut += quantity;
+      } else {
+        periodSentOut += quantity;
+        if (senderOriginal && perSCR[senderOriginal]) perSCR[senderOriginal].periodSentOut += quantity;
+      }
     }
 
-    details.push({
-      date: transferDate.toISOString().slice(0, 19).replace('T', ' '),
-      sender,
-      receiver,
-      quantity,
-      category,
-    });
+    // Only add to export details if it occurred within the audited period
+    if (!isHistorical) {
+      details.push({
+        date: transferDate.toISOString().slice(0, 19).replace('T', ' '),
+        sender,
+        receiver,
+        quantity,
+        category: (senderIsBranch && receiverIsBranch) ? 'internal'
+          : (receiverIsBranch) ? 'received' : 'sentOut',
+      });
+    }
   }
 
   return {
-    totalReceived,
-    totalSentOut,
-    totalInternal,
+    historical: {
+      received: historicalReceived,
+      sentOut: historicalSentOut,
+    },
+    period: {
+      received: periodReceived,
+      sentOut: periodSentOut,
+      internal: periodInternal,
+    },
     perSCR,
     details,
     totalRows: rows.length - 1,

@@ -161,6 +161,8 @@ export default function StockVerifierPage() {
       // Parse sales
       const salesData = await parseSalesOrders(
         salesFile,
+        selectedBranch,
+        branchSCRs,
         new Date(startDate),
         new Date(endDate)
       );
@@ -660,31 +662,69 @@ export default function StockVerifierPage() {
         {/* ═══════════ STEP 3: RESULTS ═══════════ */}
         {step === 3 && results && (
           <div className="flex flex-col gap-3">
-            {/* Balance Hero Card */}
+            {/* Closing Balance Hero Card */}
             <div className="card" style={{
               padding: '1.5rem',
               border: 'none',
-              background: results.balance >= 0
+              background: results.closingBalance >= 0
                 ? 'linear-gradient(135deg, #059669 0%, #047857 100%)'
                 : 'linear-gradient(135deg, #dc2626 0%, #b91c1c 100%)',
               color: '#fff',
               textAlign: 'center',
             }}>
               <div style={{ fontSize: '0.8125rem', opacity: 0.85, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                Stock Balance — {results.branchName}
+                Closing Stock — {results.branchName}
               </div>
               <div style={{ fontSize: '3rem', fontWeight: 800, marginTop: '0.25rem', lineHeight: 1 }}>
-                {results.balance}
+                {results.closingBalance}
               </div>
               <div style={{ fontSize: '0.875rem', opacity: 0.8, marginTop: '0.25rem' }}>
                 units remaining
               </div>
               <div style={{ fontSize: '0.6875rem', opacity: 0.6, marginTop: '0.5rem' }}>
-                {startDate} → {endDate}
+                As of {endDate}
               </div>
             </div>
 
-            {/* Summary Cards Row */}
+            {/* Opening Balance Card */}
+            <div className="card" style={{
+              padding: '1rem 1.25rem',
+              border: '2px solid var(--color-primary)',
+              boxShadow: 'none',
+              background: 'rgba(37, 99, 235, 0.04)',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div>
+                  <div style={{ fontSize: '0.6875rem', fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>
+                    Opening Stock (Carry-over)
+                  </div>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginTop: '0.125rem' }}>
+                    All activity before {startDate}
+                  </div>
+                </div>
+                <div style={{
+                  fontSize: '1.75rem',
+                  fontWeight: 800,
+                  color: results.openingBalance >= 0 ? 'var(--color-primary)' : 'var(--color-error)',
+                }}>
+                  {results.openingBalance}
+                </div>
+              </div>
+            </div>
+
+            {/* Period Activity Label */}
+            <div style={{
+              fontSize: '0.75rem',
+              fontWeight: 700,
+              color: 'var(--color-text-muted)',
+              textTransform: 'uppercase',
+              letterSpacing: '0.05em',
+              padding: '0.25rem 0.25rem 0',
+            }}>
+              Period Activity ({startDate} → {endDate})
+            </div>
+
+            {/* Period Activity Cards */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.625rem' }}>
               <div className="card" style={{ padding: '1rem', border: '1.5px solid var(--color-border)', boxShadow: 'none' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', marginBottom: '0.375rem' }}>
@@ -692,7 +732,7 @@ export default function StockVerifierPage() {
                   <span style={{ fontSize: '0.6875rem', fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>Received</span>
                 </div>
                 <div style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--color-success)' }}>
-                  +{results.totalReceived}
+                  +{results.periodReceived}
                 </div>
               </div>
               <div className="card" style={{ padding: '1rem', border: '1.5px solid var(--color-border)', boxShadow: 'none' }}>
@@ -701,7 +741,7 @@ export default function StockVerifierPage() {
                   <span style={{ fontSize: '0.6875rem', fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>Sent Out</span>
                 </div>
                 <div style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--color-error)' }}>
-                  −{results.totalSentOut}
+                  −{results.periodSentOut}
                 </div>
               </div>
               <div className="card" style={{ padding: '1rem', border: '1.5px solid var(--color-border)', boxShadow: 'none' }}>
@@ -710,7 +750,7 @@ export default function StockVerifierPage() {
                   <span style={{ fontSize: '0.6875rem', fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>Sold</span>
                 </div>
                 <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#8b5cf6' }}>
-                  −{results.totalSold}
+                  −{results.periodSold}
                 </div>
               </div>
               <div className="card" style={{ padding: '1rem', border: '1.5px solid var(--color-border)', boxShadow: 'none' }}>
@@ -719,23 +759,25 @@ export default function StockVerifierPage() {
                   <span style={{ fontSize: '0.6875rem', fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>Internal</span>
                 </div>
                 <div style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--color-text-muted)' }}>
-                  {results.totalInternal}
+                  {results.periodInternal}
                 </div>
               </div>
             </div>
 
-            {/* Formula display */}
+            {/* Ledger Formula */}
             <div style={{
               textAlign: 'center',
               fontSize: '0.75rem',
               fontWeight: 600,
               color: 'var(--color-text-muted)',
-              padding: '0.5rem',
+              padding: '0.625rem',
               background: 'var(--color-bg)',
               borderRadius: '0.5rem',
               border: '1px solid var(--color-border)',
+              lineHeight: 1.6,
             }}>
-              {results.totalReceived} received − {results.totalSentOut} sent − {results.totalSold} sold = <strong style={{ color: 'var(--color-text)' }}>{results.balance}</strong>
+              <div>{results.openingBalance} opening + {results.periodReceived} received − {results.periodSentOut} sent − {results.periodSold} sold</div>
+              <div>= <strong style={{ color: 'var(--color-text)', fontSize: '0.875rem' }}>{results.closingBalance} closing balance</strong></div>
             </div>
 
             {/* Result Tabs */}
@@ -777,7 +819,7 @@ export default function StockVerifierPage() {
             {activeResultTab === 'products' && (
               <div className="card" style={{ padding: '1rem 1.25rem', border: '1.5px solid var(--color-border)', boxShadow: 'none' }}>
                 <h3 style={{ fontSize: '0.9375rem', fontWeight: 700, marginBottom: '0.75rem' }}>
-                  Products Sold (Breakdown)
+                  Products Sold (Period)
                 </h3>
                 {Object.keys(results.productBreakdown).length === 0 ? (
                   <div style={{ fontSize: '0.875rem', color: 'var(--color-text-muted)' }}>No products found in date range.</div>
@@ -797,7 +839,7 @@ export default function StockVerifierPage() {
                               height: 6,
                               borderRadius: 3,
                               background: '#8b5cf6',
-                              width: Math.max(20, (qty / results.totalSold) * 120),
+                              width: Math.max(20, (qty / (results.periodSold || 1)) * 120),
                               transition: 'width 0.3s ease',
                             }} />
                             <span style={{ fontWeight: 700, fontSize: '0.875rem', minWidth: 28, textAlign: 'right' }}>
@@ -823,20 +865,38 @@ export default function StockVerifierPage() {
                     <div style={{ fontWeight: 700, fontSize: '0.9375rem', marginBottom: '0.5rem' }}>
                       {scr.name}
                     </div>
+
+                    {/* Opening Balance */}
+                    <div style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      marginBottom: '0.5rem',
+                      padding: '0.375rem 0.5rem',
+                      background: 'rgba(37, 99, 235, 0.06)',
+                      borderRadius: '0.375rem',
+                    }}>
+                      <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--color-primary)' }}>Opening</span>
+                      <span style={{ fontWeight: 800, fontSize: '0.9375rem', color: 'var(--color-primary)' }}>{scr.openingBalance}</span>
+                    </div>
+
+                    {/* Period Activity */}
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.5rem', fontSize: '0.8125rem' }}>
                       <div>
                         <div style={{ color: 'var(--color-text-muted)', fontSize: '0.6875rem', fontWeight: 600 }}>Received</div>
-                        <div style={{ fontWeight: 700, color: 'var(--color-success)' }}>+{scr.received}</div>
+                        <div style={{ fontWeight: 700, color: 'var(--color-success)' }}>+{scr.periodReceived}</div>
                       </div>
                       <div>
                         <div style={{ color: 'var(--color-text-muted)', fontSize: '0.6875rem', fontWeight: 600 }}>Sent Out</div>
-                        <div style={{ fontWeight: 700, color: 'var(--color-error)' }}>−{scr.sentOut}</div>
+                        <div style={{ fontWeight: 700, color: 'var(--color-error)' }}>−{scr.periodSentOut}</div>
                       </div>
                       <div>
                         <div style={{ color: 'var(--color-text-muted)', fontSize: '0.6875rem', fontWeight: 600 }}>Sold</div>
-                        <div style={{ fontWeight: 700, color: '#8b5cf6' }}>−{scr.sold}</div>
+                        <div style={{ fontWeight: 700, color: '#8b5cf6' }}>−{scr.periodSold}</div>
                       </div>
                     </div>
+
+                    {/* Closing Balance */}
                     <div style={{
                       marginTop: '0.5rem',
                       paddingTop: '0.5rem',
@@ -845,13 +905,13 @@ export default function StockVerifierPage() {
                       justifyContent: 'space-between',
                       alignItems: 'center',
                     }}>
-                      <span style={{ fontSize: '0.8125rem', fontWeight: 600, color: 'var(--color-text-muted)' }}>Balance</span>
+                      <span style={{ fontSize: '0.8125rem', fontWeight: 600, color: 'var(--color-text-muted)' }}>Closing Balance</span>
                       <span style={{
                         fontWeight: 800,
                         fontSize: '1rem',
-                        color: scr.balance >= 0 ? 'var(--color-success)' : 'var(--color-error)',
+                        color: scr.closingBalance >= 0 ? 'var(--color-success)' : 'var(--color-error)',
                       }}>
-                        {scr.balance}
+                        {scr.closingBalance}
                       </span>
                     </div>
                   </div>
@@ -883,10 +943,10 @@ export default function StockVerifierPage() {
                           </div>
                           <div style={{ textAlign: 'right' }}>
                             <div style={{ fontWeight: 700, fontSize: '0.875rem', color: '#8b5cf6' }}>
-                              {seller.sold} sold
+                              {seller.periodSold} sold
                             </div>
                             <div style={{ fontSize: '0.6875rem', color: 'var(--color-text-muted)' }}>
-                              {seller.orders} order{seller.orders !== 1 ? 's' : ''}
+                              {seller.periodOrders} order{seller.periodOrders !== 1 ? 's' : ''}
                             </div>
                           </div>
                         </div>
@@ -906,11 +966,11 @@ export default function StockVerifierPage() {
                 <div className="flex flex-col gap-3">
                   {[
                     { label: 'Transfer records scanned', value: results.stats.totalTransferRows.toLocaleString() },
-                    { label: 'Transfers matched (in date range)', value: results.stats.filteredTransferRows.toLocaleString() },
+                    { label: 'Transfers in period', value: results.stats.filteredTransferRows.toLocaleString() },
                     { label: 'Sales orders scanned', value: results.stats.totalSalesRows.toLocaleString() },
-                    { label: 'Sales matched (in date range)', value: results.stats.filteredSalesRows.toLocaleString() },
+                    { label: 'Sales in period', value: results.stats.filteredSalesRows.toLocaleString() },
                     { label: 'Branch SCRs', value: results.perSCR.length },
-                    { label: 'External sellers in sales', value: results.otherSellers.length },
+                    { label: 'External sellers in period', value: results.otherSellers.length },
                   ].map((stat) => (
                     <div key={stat.label} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.875rem' }}>
                       <span style={{ color: 'var(--color-text-muted)' }}>{stat.label}</span>

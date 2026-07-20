@@ -1,50 +1,72 @@
 import * as XLSX from 'xlsx';
 
 /**
- * Combines transfer and sales data to calculate the final stock balance
- * and generates export-ready data.
+ * Combines transfer and sales data to calculate the ledger-style stock balance.
  *
- * Formula: Balance = Total Received − Total Sent Out − Total Sold
+ * Ledger Formula:
+ *   Opening Balance = Historical Received − Historical Sent Out − Historical Sold
+ *   Closing Balance = Opening Balance + Period Received − Period Sent Out − Period Sold
  *
- * @param {Object} transferData - Output from parseTransferRecord()
- * @param {Object} salesData - Output from parseSalesOrders()
+ * @param {Object} transferData - Output from parseTransferRecord() (ledger format)
+ * @param {Object} salesData - Output from parseSalesOrders() (ledger format)
  * @param {string} branchName - Name of the selected branch
  * @param {string[]} branchSCRNames - SCR names for this branch
- * @returns {Object} Combined results with balance and per-SCR breakdown
+ * @returns {Object} Combined results with opening/closing balance and per-SCR breakdown
  */
 export function calculateStockBalance(transferData, salesData, branchName, branchSCRNames) {
-  const balance = transferData.totalReceived - transferData.totalSentOut - salesData.totalUnitsSold;
+  // Branch-level opening balance (all activity before the selected period)
+  const openingBalance =
+    transferData.historical.received -
+    transferData.historical.sentOut -
+    salesData.historical.unitsSold;
+
+  // Branch-level closing balance
+  const closingBalance =
+    openingBalance +
+    transferData.period.received -
+    transferData.period.sentOut -
+    salesData.period.unitsSold;
 
   // Build per-SCR combined breakdown
   const perSCRCombined = branchSCRNames.map((name) => {
-    const transfer = transferData.perSCR[name] || { received: 0, sentOut: 0, internal: 0 };
-    const sales = salesData.perSCR[name] || { unitsSold: 0, orderCount: 0 };
+    const t = transferData.perSCR[name] || {
+      historicalReceived: 0,
+      historicalSentOut: 0,
+      periodReceived: 0,
+      periodSentOut: 0,
+      periodInternal: 0,
+    };
+    const s = salesData.period.perSCR[name] || { historicalSold: 0, periodSold: 0, periodOrders: 0 };
+
+    const scrOpening = t.historicalReceived - t.historicalSentOut - s.historicalSold;
+    const scrClosing = scrOpening + t.periodReceived - t.periodSentOut - s.periodSold;
 
     return {
       name,
-      received: transfer.received,
-      sentOut: transfer.sentOut,
-      internal: transfer.internal,
-      sold: sales.unitsSold,
-      orders: sales.orderCount,
-      balance: transfer.received - transfer.sentOut - sales.unitsSold,
+      openingBalance: scrOpening,
+      periodReceived: t.periodReceived,
+      periodSentOut: t.periodSentOut,
+      periodInternal: t.periodInternal,
+      periodSold: s.periodSold,
+      periodOrders: s.periodOrders,
+      closingBalance: scrClosing,
     };
   });
 
   // Also include sellers from the sales file who are NOT registered branch SCRs
-  // (so the admin can see all sales attribution)
   const branchSCRNamesLower = new Set(branchSCRNames.map((n) => n.toLowerCase().trim()));
   const otherSellers = [];
-  for (const [name, data] of Object.entries(salesData.perSCR)) {
+  for (const [name, data] of Object.entries(salesData.period.perSCR)) {
     if (!branchSCRNamesLower.has(name.toLowerCase().trim())) {
       otherSellers.push({
         name,
-        received: 0,
-        sentOut: 0,
-        internal: 0,
-        sold: data.unitsSold,
-        orders: data.orderCount,
-        balance: -data.unitsSold, // They sold stock but didn't receive any (from this branch's perspective)
+        openingBalance: 0,
+        periodReceived: 0,
+        periodSentOut: 0,
+        periodInternal: 0,
+        periodSold: data.periodSold,
+        periodOrders: data.periodOrders,
+        closingBalance: -data.periodSold,
         isExternal: true,
       });
     }
@@ -52,16 +74,17 @@ export function calculateStockBalance(transferData, salesData, branchName, branc
 
   return {
     branchName,
-    totalReceived: transferData.totalReceived,
-    totalSentOut: transferData.totalSentOut,
-    totalInternal: transferData.totalInternal,
-    totalSold: salesData.totalUnitsSold,
-    balance,
+    openingBalance,
+    periodReceived: transferData.period.received,
+    periodSentOut: transferData.period.sentOut,
+    periodInternal: transferData.period.internal,
+    periodSold: salesData.period.unitsSold,
+    closingBalance,
     perSCR: perSCRCombined,
     otherSellers,
-    productBreakdown: salesData.productBreakdown,
+    productBreakdown: salesData.period.productBreakdown,
     transferDetails: transferData.details,
-    salesDetails: salesData.orderDetails,
+    salesDetails: salesData.period.orderDetails,
     stats: {
       totalTransferRows: transferData.totalRows,
       filteredTransferRows: transferData.filteredRows,
@@ -81,19 +104,22 @@ export function calculateStockBalance(transferData, salesData, branchName, branc
 export function exportStockVerification(results, startDateStr, endDateStr) {
   const workbook = XLSX.utils.book_new();
 
-  // Sheet 1: Summary
+  // Sheet 1: Summary (Ledger format)
   const summaryData = [
     { Field: 'Branch', Value: results.branchName },
-    { Field: 'Date Range', Value: `${startDateStr} to ${endDateStr}` },
+    { Field: 'Audit Period', Value: `${startDateStr} to ${endDateStr}` },
     { Field: '', Value: '' },
-    { Field: 'Total Stock Received', Value: results.totalReceived },
-    { Field: 'Total Stock Sent Out', Value: results.totalSentOut },
-    { Field: 'Internal Transfers', Value: results.totalInternal },
-    { Field: 'Total Units Sold', Value: results.totalSold },
+    { Field: '═══ STOCK LEDGER ═══', Value: '' },
+    { Field: 'Opening Stock (Carry-over)', Value: results.openingBalance },
     { Field: '', Value: '' },
-    { Field: 'STOCK BALANCE', Value: results.balance },
+    { Field: '  (+) Stock Received (Period)', Value: results.periodReceived },
+    { Field: '  (−) Stock Sent Out (Period)', Value: results.periodSentOut },
+    { Field: '  (−) Stock Sold (Period)', Value: results.periodSold },
+    { Field: '  (○) Internal Transfers (Period)', Value: results.periodInternal },
     { Field: '', Value: '' },
-    { Field: '--- Product Breakdown (Sales) ---', Value: '' },
+    { Field: 'CLOSING STOCK BALANCE', Value: results.closingBalance },
+    { Field: '', Value: '' },
+    { Field: '═══ PRODUCT BREAKDOWN (Sales, Period Only) ═══', Value: '' },
   ];
 
   // Add product breakdown
@@ -109,22 +135,24 @@ export function exportStockVerification(results, startDateStr, endDateStr) {
   const scrData = [
     ...results.perSCR.map((s) => ({
       'SCR Name': s.name,
-      'Stock Received': s.received,
-      'Stock Sent Out': s.sentOut,
-      'Internal Transfers': s.internal,
-      'Units Sold': s.sold,
-      'Orders': s.orders,
-      'Balance': s.balance,
+      'Opening Balance': s.openingBalance,
+      'Received (Period)': s.periodReceived,
+      'Sent Out (Period)': s.periodSentOut,
+      'Internal (Period)': s.periodInternal,
+      'Sold (Period)': s.periodSold,
+      'Orders (Period)': s.periodOrders,
+      'Closing Balance': s.closingBalance,
       'Type': 'Branch SCR',
     })),
     ...results.otherSellers.map((s) => ({
       'SCR Name': s.name,
-      'Stock Received': s.received,
-      'Stock Sent Out': s.sentOut,
-      'Internal Transfers': s.internal,
-      'Units Sold': s.sold,
-      'Orders': s.orders,
-      'Balance': s.balance,
+      'Opening Balance': s.openingBalance,
+      'Received (Period)': s.periodReceived,
+      'Sent Out (Period)': s.periodSentOut,
+      'Internal (Period)': s.periodInternal,
+      'Sold (Period)': s.periodSold,
+      'Orders (Period)': s.periodOrders,
+      'Closing Balance': s.closingBalance,
       'Type': 'External Seller',
     })),
   ];
