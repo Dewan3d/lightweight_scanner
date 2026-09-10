@@ -50,10 +50,10 @@ export async function uploadCrmInventory(file, onProgress = () => {}) {
 
   const batchId = crypto.randomUUID();
 
-  // Delete all previous records (we only keep the latest upload)
-  const { error: deleteError } = await supabase.from('crm_inventory').delete().neq('serial_number', '_impossible_serial_number_');
-  if (deleteError) {
-    console.error('Failed to clear previous CRM data:', deleteError);
+  // Clear all previous records using TRUNCATE via RPC (instant, no dead rows)
+  const { error: truncateError } = await supabase.rpc('truncate_crm_inventory');
+  if (truncateError) {
+    console.error('Failed to clear previous CRM data:', truncateError);
     // Continue anyway — insert will still work
   }
 

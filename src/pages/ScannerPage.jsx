@@ -106,21 +106,16 @@ export default function ScannerPage() {
           handleScanError(err);
         }
       } else {
-        // Dual Scan Mode (Serial Number + Paygo)
-        if (activeSlot === 'serial') {
+        // Dual Scan Mode — Serial Number must always be scanned first
+        if (!serialValue || activeSlot === 'serial') {
+          // First scan always captures the serial number
           setSerialValue(decodedText);
-          toast.success(`Serial Number captured!`, { position: 'bottom-center' });
-          // Auto switch to paygo slot if empty
-          if (!paygoValue) {
-            setActiveSlot('paygo');
-          }
-        } else {
+          toast.success('Serial Number captured! Now scan Paygo Code.', { position: 'bottom-center' });
+          setActiveSlot('paygo');
+        } else if (activeSlot === 'paygo' && serialValue) {
+          // Second scan captures the paygo code
           setPaygoValue(decodedText);
-          toast.success(`Paygo Code captured!`, { position: 'bottom-center' });
-          // Auto switch back to serial if empty
-          if (!serialValue) {
-            setActiveSlot('serial');
-          }
+          toast.success('Paygo Code captured!', { position: 'bottom-center' });
         }
       }
 
@@ -345,7 +340,7 @@ export default function ScannerPage() {
               }}
             >
               <Layers size={16} />
-              {scanMode === 'dual' ? 'Dual Slot' : 'Single Slot'}
+              {scanMode === 'dual' ? 'Dual Scan' : 'Serial Only'}
             </button>
           </div>
         </div>
@@ -385,7 +380,7 @@ export default function ScannerPage() {
 
             {/* Paygo Code Slot */}
             <button
-              onClick={() => setActiveSlot('paygo')}
+              onClick={() => { if (serialValue) setActiveSlot('paygo'); else toast.error('Scan Serial Number first!', { position: 'bottom-center' }); }}
               style={{
                 flex: 1,
                 background: activeSlot === 'paygo' ? 'rgba(37, 99, 235, 0.4)' : 'transparent',
@@ -394,56 +389,37 @@ export default function ScannerPage() {
                 padding: '0.5rem',
                 color: '#fff',
                 textAlign: 'left',
-                cursor: 'pointer',
+                cursor: serialValue ? 'pointer' : 'not-allowed',
+                opacity: serialValue ? 1 : 0.5,
               }}
             >
               <div style={{ fontSize: '0.75rem', opacity: 0.8, fontWeight: 600 }}>Paygo Code</div>
               <div style={{ fontSize: '0.875rem', fontWeight: 700, fontFamily: 'monospace', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: '0.125rem' }}>
-                {paygoValue || 'Tap to Scan...'}
+                {paygoValue || (serialValue ? 'Tap to Scan...' : 'Scan Serial first')}
               </div>
             </button>
 
             {/* Actions Panel */}
             <div className="flex gap-1">
-              {/* Save Button (when at least serial is present but paygo is not yet filled) */}
+              {/* Prompt to scan Paygo when serial is captured but paygo is missing */}
               {serialValue && !paygoValue && (
-                <button
-                  onClick={async () => {
-                    toast.loading('Saving Serial only...', { id: 'save-loader', position: 'bottom-center' });
-                    try {
-                      const { error } = await supabase.from('scans').insert({
-                        barcode: serialValue,
-                        paygo: null,
-                        scanned_by: user.id,
-                        branch_id: profile.branch_id,
-                      });
-                      if (error) throw error;
-                      toast.dismiss('save-loader');
-                      toast.success('Saved Serial Number!', { position: 'bottom-center' });
-                      setSerialValue('');
-                      setPaygoValue('');
-                      setActiveSlot('serial');
-                    } catch (err) {
-                      toast.dismiss('save-loader');
-                      handleScanError(err);
-                    }
-                  }}
+                <div
                   style={{
-                    background: 'var(--color-success)',
-                    border: 'none',
+                    background: 'rgba(245, 158, 11, 0.15)',
+                    border: '1.5px solid #f59e0b',
                     borderRadius: '0.5rem',
                     padding: '0.5rem 0.75rem',
-                    color: '#fff',
-                    cursor: 'pointer',
+                    color: '#fbbf24',
                     fontWeight: 700,
-                    fontSize: '0.875rem',
-                    minHeight: 40,
+                    fontSize: '0.75rem',
                     display: 'flex',
                     alignItems: 'center',
+                    minHeight: 40,
+                    whiteSpace: 'nowrap',
                   }}
                 >
-                  Save
-                </button>
+                  Scan Paygo ▸
+                </div>
               )}
 
               {/* Clear Button */}
