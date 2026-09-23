@@ -5,7 +5,8 @@ import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import ScannerOverlay from '../components/ScannerOverlay';
-import { ArrowLeft, ScanLine, Layers, RefreshCw } from 'lucide-react';
+import { ArrowLeft, ScanLine, Layers, RefreshCw, CheckCircle2 } from 'lucide-react';
+import { isPaygoBarcode, isSerialBarcode, classifyBarcode } from '../utils/barcodeClassifier';
 
 export default function ScannerPage() {
   const { user, profile } = useAuth();
@@ -79,17 +80,46 @@ export default function ScannerPage() {
   // Main callback when a barcode is decoded
   const handleScanSuccess = useCallback(
     async (decodedText) => {
-      // Debounce: ignore repeated identical scans within 1.5 seconds
+      // Debounce: ignore repeated identical scans within cooldown
       if (cooldownRef.current || decodedText === lastScannedRef.current) return;
-      cooldownRef.current = true;
-      lastScannedRef.current = decodedText;
 
-      playBeep();
-      setShowFlash(true);
-      setTimeout(() => setShowFlash(false), 400);
+      const isPaygo = isPaygoBarcode(decodedText);
+      const isSerial = isSerialBarcode(decodedText);
 
+      // SINGLE SCAN MODE: Exclusively capture the 17-character Serial Number
       if (scanMode === 'single') {
-        // Single Scan Mode: save immediately
+        if (isPaygo) {
+          // Temporarily remember this scan to avoid toast spam
+          lastScannedRef.current = decodedText;
+          setTimeout(() => {
+            if (lastScannedRef.current === decodedText) {
+              lastScannedRef.current = '';
+            }
+          }, 800);
+
+          // Alert user that PayGo was detected and skipped
+          toast.error(`Ignored PayGo (${decodedText}). Please aim at the 17-digit Serial number (e.g. P-...).`, {
+            id: 'paygo-ignored',
+            duration: 2500,
+            position: 'bottom-center',
+            style: {
+              background: '#854d0e',
+              color: '#fff',
+              fontWeight: 600,
+              fontSize: '0.85rem',
+            },
+          });
+          return;
+        }
+
+        // It is a valid serial number (or non-paygo barcode)
+        cooldownRef.current = true;
+        lastScannedRef.current = decodedText;
+
+        playBeep();
+        setShowFlash(true);
+        setTimeout(() => setShowFlash(false), 400);
+
         toast.success(`Scanned Serial: ${decodedText}`, {
           duration: 2000,
           position: 'bottom-center',
@@ -106,16 +136,26 @@ export default function ScannerPage() {
           handleScanError(err);
         }
       } else {
-        // Dual Scan Mode — Serial Number must always be scanned first
-        if (!serialValue || activeSlot === 'serial') {
-          // First scan always captures the serial number
+        // DUAL SCAN MODE: Smart auto-routing based on barcode pattern
+        cooldownRef.current = true;
+        lastScannedRef.current = decodedText;
+
+        playBeep();
+        setShowFlash(true);
+        setTimeout(() => setShowFlash(false), 400);
+
+        if (isSerial || (!isPaygo && activeSlot === 'serial')) {
           setSerialValue(decodedText);
-          toast.success('Serial Number captured! Now scan Paygo Code.', { position: 'bottom-center' });
-          setActiveSlot('paygo');
-        } else if (activeSlot === 'paygo' && serialValue) {
-          // Second scan captures the paygo code
+          toast.success(`Serial captured: ${decodedText}`, { position: 'bottom-center' });
+          if (!paygoValue) {
+            setActiveSlot('paygo');
+          }
+        } else if (isPaygo || activeSlot === 'paygo') {
           setPaygoValue(decodedText);
-          toast.success('Paygo Code captured!', { position: 'bottom-center' });
+          toast.success(`PayGo captured: ${decodedText}`, { position: 'bottom-center' });
+          if (!serialValue) {
+            setActiveSlot('serial');
+          }
         }
       }
 
@@ -198,25 +238,36 @@ export default function ScannerPage() {
           console.warn('Failed to query cameras, falling back to facingMode:', e);
         }
 
-        // Configure qrbox shape based on selection (wide horizontal for 1D barcodes vs square for QR)
+        // Configure qrbox dynamically so long 17-character barcodes fit without getting clipped
         const qrboxConfig = isWide
-          ? { width: 320, height: 120 }
-          : { width: 250, height: 250 };
+          ? (viewfinderWidth, viewfinderHeight) => {
+              const width = Math.min(Math.floor(viewfinderWidth * 0.92), 480);
+              const height = Math.min(Math.floor(viewfinderHeight * 0.32), 160);
+              return { width: Math.max(width, 280), height: Math.max(height, 100) };
+            }
+          : (viewfinderWidth, viewfinderHeight) => {
+              const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
+              const size = Math.floor(minEdge * 0.72);
+              return { width: size, height: size };
+            };
 
         await html5Qrcode.start(
           cameraSelector,
           {
-            fps: 15,
+            fps: 20,
             qrbox: qrboxConfig,
             videoConstraints: {
-              width: 1280,
-              height: 720,
+              width: { min: 1280, ideal: 1920, max: 2560 },
+              height: { min: 720, ideal: 1080, max: 1440 },
               facingMode: 'environment',
+              advanced: [{ focusMode: 'continuous' }],
             },
             formatsToSupport: [
-              Html5QrcodeSupportedFormats.QR_CODE,
               Html5QrcodeSupportedFormats.CODE_128,
               Html5QrcodeSupportedFormats.CODE_39,
+              Html5QrcodeSupportedFormats.CODE_93,
+              Html5QrcodeSupportedFormats.QR_CODE,
+              Html5QrcodeSupportedFormats.DATA_MATRIX,
               Html5QrcodeSupportedFormats.UPC_A,
               Html5QrcodeSupportedFormats.UPC_E,
               Html5QrcodeSupportedFormats.EAN_13,
@@ -345,6 +396,28 @@ export default function ScannerPage() {
           </div>
         </div>
 
+        {/* Single Mode Status Badge */}
+        {scanMode === 'single' && (
+          <div
+            className="flex items-center justify-between"
+            style={{
+              background: 'rgba(37, 99, 235, 0.2)',
+              border: '1px solid rgba(59, 130, 246, 0.4)',
+              borderRadius: '0.5rem',
+              padding: '0.4rem 0.75rem',
+              color: '#93c5fd',
+              fontSize: '0.75rem',
+              fontWeight: 600,
+            }}
+          >
+            <div className="flex items-center gap-1.5">
+              <CheckCircle2 size={14} style={{ color: '#60a5fa' }} />
+              <span>Target: Serial (starts with P-...)</span>
+            </div>
+            <span style={{ color: '#fbbf24', fontSize: '0.7rem' }}>9-Digit PayGo Ignored</span>
+          </div>
+        )}
+
         {/* Dynamic Dual Scan Slots */}
         {scanMode === 'dual' && (
           <div
@@ -460,7 +533,7 @@ export default function ScannerPage() {
       />
 
       {/* Frame overlay */}
-      <ScannerOverlay isWide={isWide} />
+      <ScannerOverlay isWide={isWide} scanMode={scanMode} activeSlot={activeSlot} />
 
       {/* Green screen flash */}
       {showFlash && <div className="scanner-flash" />}

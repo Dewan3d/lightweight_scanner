@@ -1,8 +1,30 @@
-export default function ScannerOverlay({ isWide = false }) {
-  const width = isWide ? 320 : 260;
-  const height = isWide ? 120 : 260;
+import { useState, useEffect } from 'react';
+
+export default function ScannerOverlay({ isWide = false, scanMode = 'single', activeSlot = 'serial' }) {
+  const [windowWidth, setWindowWidth] = useState(
+    typeof window !== 'undefined' ? window.innerWidth : 360
+  );
+
+  useEffect(() => {
+    const handleResize = () => setWindowWidth(window.innerWidth);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // For 17-character serial barcodes, allow up to 92% of the screen width (max 440px)
+  const width = isWide ? Math.min(Math.floor(windowWidth * 0.92), 440) : 260;
+  const height = isWide ? 130 : 260;
   const xTranslate = -width / 2;
   const yTranslate = -height / 2;
+
+  let guideText = 'Align barcode within frame';
+  if (scanMode === 'single') {
+    guideText = 'Align 17-digit Serial Barcode (starts with P-...)';
+  } else if (scanMode === 'dual') {
+    guideText = activeSlot === 'serial'
+      ? 'Step 1: Align Serial Barcode (e.g. P-...)'
+      : 'Step 2: Align PayGo Barcode (9 digits)';
+  }
 
   return (
     <div className="scanner-overlay">
@@ -113,7 +135,7 @@ export default function ScannerOverlay({ isWide = false }) {
           textShadow: '0 2px 4px rgba(0,0,0,0.8)',
         }}
       >
-        Align {isWide ? 'barcode' : 'QR code'} within the frame
+        {guideText}
       </div>
     </div>
   );
